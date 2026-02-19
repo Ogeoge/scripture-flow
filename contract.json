@@ -1,0 +1,426 @@
+{
+  "app_name": "ScriptureFlow",
+  "project_type": "other",
+  "platforms": [
+    "android"
+  ],
+  "session_strategy": "none",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "auth_required": false,
+      "description": "Local health endpoint used only for internal diagnostics/tests. Must return JSON: {\"status\":\"ok\"}."
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "auth_required": false,
+      "description": "Offline-only no-op endpoint placeholder for contract completeness. Must return JSON error with code=AUTH_NOT_SUPPORTED."
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "auth_required": false,
+      "description": "Offline-only no-op endpoint placeholder for contract completeness. Must return JSON error with code=AUTH_NOT_SUPPORTED."
+    }
+  ],
+  "data_models": [
+    {
+      "name": "ErrorResponse",
+      "description": "Canonical error shape used by any endpoint-like surface (including no-op auth endpoints).",
+      "fields": [
+        {
+          "name": "error",
+          "type": "object",
+          "required": true,
+          "description": "Container for error details."
+        },
+        {
+          "name": "error.code",
+          "type": "string",
+          "required": true,
+          "description": "Stable machine-readable error code (e.g., AUTH_NOT_SUPPORTED, INVALID_ARGUMENT)."
+        },
+        {
+          "name": "error.message",
+          "type": "string",
+          "required": true,
+          "description": "Human-readable message safe to show to users."
+        },
+        {
+          "name": "error.details",
+          "type": "object|null",
+          "required": false,
+          "description": "Optional structured details for debugging/validation."
+        }
+      ]
+    },
+    {
+      "name": "VerseRef",
+      "description": "A stable reference to a specific verse.",
+      "fields": [
+        {
+          "name": "book_id",
+          "type": "string",
+          "required": true,
+          "description": "Stable book identifier (e.g., 'GEN', 'EXO', 'MAT')."
+        },
+        {
+          "name": "chapter",
+          "type": "int",
+          "required": true,
+          "description": "1-based chapter number."
+        },
+        {
+          "name": "verse",
+          "type": "int",
+          "required": true,
+          "description": "1-based verse number."
+        }
+      ]
+    },
+    {
+      "name": "VerseRange",
+      "description": "Inclusive range of verses in a single book. Chapter may differ between start and end (range allowed across chapters).",
+      "fields": [
+        {
+          "name": "start",
+          "type": "VerseRef",
+          "required": true,
+          "description": "Range start (inclusive)."
+        },
+        {
+          "name": "end",
+          "type": "VerseRef",
+          "required": true,
+          "description": "Range end (inclusive). Must not be before start."
+        }
+      ]
+    },
+    {
+      "name": "Bookmark",
+      "description": "User bookmark for a verse range with optional note.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Client-generated UUID."
+        },
+        {
+          "name": "range",
+          "type": "VerseRange",
+          "required": true,
+          "description": "Bookmarked verse range."
+        },
+        {
+          "name": "note",
+          "type": "string|null",
+          "required": false,
+          "description": "Optional user note."
+        },
+        {
+          "name": "created_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "Creation timestamp."
+        },
+        {
+          "name": "updated_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "Last update timestamp."
+        }
+      ]
+    },
+    {
+      "name": "Highlight",
+      "description": "User highlight for a verse range with a color.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Client-generated UUID."
+        },
+        {
+          "name": "range",
+          "type": "VerseRange",
+          "required": true,
+          "description": "Highlighted verse range."
+        },
+        {
+          "name": "color",
+          "type": "string",
+          "required": true,
+          "description": "One of: YELLOW, GREEN, BLUE, PINK, ORANGE, PURPLE (case-sensitive)."
+        },
+        {
+          "name": "created_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "Creation timestamp."
+        },
+        {
+          "name": "updated_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "Last update timestamp."
+        }
+      ]
+    },
+    {
+      "name": "ReadingSettings",
+      "description": "Reader display settings persisted locally.",
+      "fields": [
+        {
+          "name": "font_size_sp",
+          "type": "float",
+          "required": true,
+          "description": "Font size in sp. Must be within app-defined bounds."
+        },
+        {
+          "name": "line_spacing_multiplier",
+          "type": "float",
+          "required": true,
+          "description": "Line height multiplier (e.g., 1.0..2.0)."
+        },
+        {
+          "name": "paragraph_spacing_dp",
+          "type": "float",
+          "required": true,
+          "description": "Space between paragraphs in dp."
+        },
+        {
+          "name": "font_family",
+          "type": "string",
+          "required": true,
+          "description": "One of: SERIF, SANS."
+        },
+        {
+          "name": "red_letter_enabled",
+          "type": "boolean",
+          "required": true,
+          "description": "If true, render red-letter segments in red where supported by assets."
+        },
+        {
+          "name": "theme_override",
+          "type": "string",
+          "required": true,
+          "description": "One of: SYSTEM, LIGHT, DARK."
+        }
+      ]
+    },
+    {
+      "name": "LastLocation",
+      "description": "Last reading location persisted locally for Continue Reading.",
+      "fields": [
+        {
+          "name": "ref",
+          "type": "VerseRef",
+          "required": true,
+          "description": "Last verse location (may represent chapter start if verse unknown)."
+        },
+        {
+          "name": "updated_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "Timestamp when last location was stored."
+        }
+      ]
+    },
+    {
+      "name": "BibleAsset",
+      "description": "Expected minimal asset structure for Bible text loaded from android/app/src/main/assets/bible/kjv.json. Used for parsing/indexing; not stored in Room.",
+      "fields": [
+        {
+          "name": "translation_id",
+          "type": "string",
+          "required": true,
+          "description": "E.g., 'KJV'."
+        },
+        {
+          "name": "books",
+          "type": "array<BookAsset>",
+          "required": true,
+          "description": "Books in canonical order."
+        }
+      ]
+    },
+    {
+      "name": "BookAsset",
+      "description": "Bible book in asset file.",
+      "fields": [
+        {
+          "name": "book_id",
+          "type": "string",
+          "required": true,
+          "description": "Stable identifier (e.g., 'GEN')."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Display name (e.g., 'Genesis')."
+        },
+        {
+          "name": "chapters",
+          "type": "array<ChapterAsset>",
+          "required": true,
+          "description": "Chapters in order."
+        }
+      ]
+    },
+    {
+      "name": "ChapterAsset",
+      "description": "Bible chapter in asset file.",
+      "fields": [
+        {
+          "name": "chapter",
+          "type": "int",
+          "required": true,
+          "description": "1-based chapter number."
+        },
+        {
+          "name": "verses",
+          "type": "array<VerseAsset>",
+          "required": true,
+          "description": "Verses in order."
+        }
+      ]
+    },
+    {
+      "name": "VerseAsset",
+      "description": "Bible verse in asset file, optionally with red-letter segments.",
+      "fields": [
+        {
+          "name": "verse",
+          "type": "int",
+          "required": true,
+          "description": "1-based verse number."
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "Full verse text as plain string (always present)."
+        },
+        {
+          "name": "red_letter_ranges",
+          "type": "array<Range>",
+          "required": false,
+          "description": "Optional list of UTF-16 code-unit [start,end) ranges within 'text' to render in red."
+        }
+      ]
+    },
+    {
+      "name": "Range",
+      "description": "Half-open character range for highlighting within a string.",
+      "fields": [
+        {
+          "name": "start",
+          "type": "int",
+          "required": true,
+          "description": "Start index (inclusive)."
+        },
+        {
+          "name": "end",
+          "type": "int",
+          "required": true,
+          "description": "End index (exclusive). Must be >= start."
+        }
+      ]
+    },
+    {
+      "name": "VerseOfTheDayScheduleAsset",
+      "description": "Expected minimal asset structure for VOTD schedule loaded from android/app/src/main/assets/votd/votd.json.",
+      "fields": [
+        {
+          "name": "version",
+          "type": "int",
+          "required": true,
+          "description": "Schedule version."
+        },
+        {
+          "name": "timezone",
+          "type": "string",
+          "required": true,
+          "description": "IANA timezone id used for day calculation (e.g., 'UTC' or 'America/New_York')."
+        },
+        {
+          "name": "days",
+          "type": "array<VotdDay>",
+          "required": true,
+          "description": "List length 366 max. Mapping is deterministic and repeats yearly if desired."
+        }
+      ]
+    },
+    {
+      "name": "VotdDay",
+      "description": "A single day mapping entry in the schedule.",
+      "fields": [
+        {
+          "name": "day_of_year",
+          "type": "int",
+          "required": true,
+          "description": "1..366"
+        },
+        {
+          "name": "ref",
+          "type": "VerseRef",
+          "required": true,
+          "description": "Verse reference for that day."
+        }
+      ]
+    }
+  ],
+  "database": {
+    "kind": "sqlite",
+    "notes": "Room-backed on-device SQLite only. No network sync. Bible text and VOTD schedule are assets and are NOT stored in SQLite.",
+    "ddl": "PRAGMA foreign_keys=ON;\n\n-- User bookmarks (verse ranges + optional note)\nCREATE TABLE IF NOT EXISTS bookmarks (\n  id TEXT PRIMARY KEY NOT NULL,\n  start_book_id TEXT NOT NULL,\n  start_chapter INTEGER NOT NULL,\n  start_verse INTEGER NOT NULL,\n  end_book_id TEXT NOT NULL,\n  end_chapter INTEGER NOT NULL,\n  end_verse INTEGER NOT NULL,\n  note TEXT,\n  created_at_epoch_ms INTEGER NOT NULL,\n  updated_at_epoch_ms INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_bookmarks_start ON bookmarks(start_book_id, start_chapter, start_verse);\nCREATE INDEX IF NOT EXISTS idx_bookmarks_end ON bookmarks(end_book_id, end_chapter, end_verse);\n\n-- User highlights (verse ranges + color)\nCREATE TABLE IF NOT EXISTS highlights (\n  id TEXT PRIMARY KEY NOT NULL,\n  start_book_id TEXT NOT NULL,\n  start_chapter INTEGER NOT NULL,\n  start_verse INTEGER NOT NULL,\n  end_book_id TEXT NOT NULL,\n  end_chapter INTEGER NOT NULL,\n  end_verse INTEGER NOT NULL,\n  color TEXT NOT NULL,\n  created_at_epoch_ms INTEGER NOT NULL,\n  updated_at_epoch_ms INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_highlights_start ON highlights(start_book_id, start_chapter, start_verse);\nCREATE INDEX IF NOT EXISTS idx_highlights_end ON highlights(end_book_id, end_chapter, end_verse);\n\n-- Simple preferences storage (settings + last location) in one table.\n-- Keys are stable constants in code.\nCREATE TABLE IF NOT EXISTS preferences (\n  key TEXT PRIMARY KEY NOT NULL,\n  value TEXT NOT NULL,\n  updated_at_epoch_ms INTEGER NOT NULL\n);\n\n-- Required preference keys (value JSON):\n-- 'reading_settings' => ReadingSettings JSON\n-- 'last_location'    => LastLocation JSON\n"
+  },
+  "required_files": [
+    "CONTRACT.md",
+    "android/README.md",
+    "android/app/src/main/AndroidManifest.xml",
+    "android/app/src/main/java/com/scriptureflow/MainActivity.kt",
+    "android/app/src/main/java/com/scriptureflow/app/AppNavGraph.kt",
+    "android/app/src/main/java/com/scriptureflow/app/Routes.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/theme/Theme.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/theme/Color.kt",
+    "android/app/src/main/java/com/scriptureflow/domain/model/Reference.kt",
+    "android/app/src/main/java/com/scriptureflow/domain/model/Bookmark.kt",
+    "android/app/src/main/java/com/scriptureflow/domain/model/Highlight.kt",
+    "android/app/src/main/java/com/scriptureflow/data/assets/BibleAssetModels.kt",
+    "android/app/src/main/java/com/scriptureflow/data/assets/BibleAssetLoader.kt",
+    "android/app/src/main/java/com/scriptureflow/data/assets/VerseOfDayAssetLoader.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/AppDatabase.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/entities/BookmarkEntity.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/entities/HighlightEntity.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/entities/PreferenceEntity.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/dao/BookmarkDao.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/dao/HighlightDao.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/dao/PreferenceDao.kt",
+    "android/app/src/main/java/com/scriptureflow/data/repo/ScriptureRepository.kt",
+    "android/app/src/main/java/com/scriptureflow/domain/search/SearchEngine.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/components/NavigationDrawer.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/home/HomeScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/home/HomeViewModel.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/reader/ReaderScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/search/SearchScreen.kt"
+  ],
+  "invariants": [
+    "All clients use the same endpoint paths and JSON fields as defined here.",
+    "No renaming of routes, fields, or tables without updating contract.",
+    "Backend must return JSON errors in a consistent shape.",
+    "Session strategy is NONE: no login, no auth tokens, no cookies, and no network sync. Any auth endpoints are no-op placeholders returning ErrorResponse with code=AUTH_NOT_SUPPORTED.",
+    "App is fully offline-first: all scripture text and verse-of-the-day data must be loaded from assets; app must not require network access to function.",
+    "Room (SQLite) is the only persistence mechanism for user data (bookmarks/highlights/preferences/last location). Do not store Bible text in Room.",
+    "Asset format is contractual: bible/kjv.json must parse into BibleAsset; votd/votd.json must parse into VerseOfTheDayScheduleAsset. Any format change requires updating CONTRACT.md and parsing code together.",
+    "Search must support partial-word matching (substring match) and return match ranges suitable for UI highlighting; matching must be case-insensitive using Unicode-aware lowercasing.",
+    "Red-letter rendering must be driven solely by VerseAsset.red_letter_ranges when present; if absent, the verse renders with no red-letter styling (never guess).",
+    "Accessibility: interactive UI elements and navigational controls must provide meaningful semantics/contentDescription labels.",
+    "Theme defaults to system (SYSTEM). Manual override (LIGHT/DARK) must not alter stored data models beyond ReadingSettings.theme_override."
+  ]
+}

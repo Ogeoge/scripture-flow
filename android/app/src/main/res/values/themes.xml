@@ -1,0 +1,13 @@
+<resources>
+
+    <!--
+      Keep resource linking independent of Material3/AppCompat base styles.
+      Compose Material3 theming is handled in Kotlin (ui/theme/Theme.kt).
+    -->
+
+    <style name="Theme.ScriptureFlow" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+
+</resources>

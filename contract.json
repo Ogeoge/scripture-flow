@@ -1,0 +1,268 @@
+{
+  "app_name": "ScriptureFlow",
+  "project_type": "other",
+  "platforms": [
+    "android"
+  ],
+  "session_strategy": "none",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "auth_required": false,
+      "description": "Liveness/health check. Must return HTTP 200 and JSON {\"status\":\"ok\"}."
+    }
+  ],
+  "data_models": [
+    {
+      "name": "VerseRef",
+      "description": "Canonical verse reference used across app layers and persistence.",
+      "fields": [
+        {
+          "name": "book",
+          "type": "string",
+          "required": true,
+          "description": "Book name, e.g., \"Genesis\"."
+        },
+        {
+          "name": "chapter",
+          "type": "int",
+          "required": true,
+          "description": "1-based chapter number."
+        },
+        {
+          "name": "verse",
+          "type": "int",
+          "required": true,
+          "description": "1-based verse number."
+        }
+      ]
+    },
+    {
+      "name": "Verse",
+      "description": "A single Bible verse loaded from local KJV assets and optionally cached for fast search.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "description": "Stable primary key string in the form \"{book}|{chapter}|{verse}\"."
+        },
+        {
+          "name": "ref",
+          "type": "VerseRef",
+          "required": true,
+          "description": "Reference information."
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "Verse text (KJV)."
+        }
+      ]
+    },
+    {
+      "name": "SearchResult",
+      "description": "Search result returned by local search engine (no network).",
+      "fields": [
+        {
+          "name": "verse",
+          "type": "Verse",
+          "required": true,
+          "description": "Matched verse."
+        },
+        {
+          "name": "match_ranges",
+          "type": "array<MatchRange>",
+          "required": true,
+          "description": "List of highlight ranges in verse.text, inclusive start, exclusive end."
+        }
+      ]
+    },
+    {
+      "name": "MatchRange",
+      "description": "A half-open range used for highlighting matched substrings.",
+      "fields": [
+        {
+          "name": "start",
+          "type": "int",
+          "required": true,
+          "description": "0-based start index in the verse text."
+        },
+        {
+          "name": "end",
+          "type": "int",
+          "required": true,
+          "description": "0-based exclusive end index in the verse text."
+        }
+      ]
+    },
+    {
+      "name": "Bookmark",
+      "description": "User bookmark of a verse stored locally via Room.",
+      "fields": [
+        {
+          "name": "verse_id",
+          "type": "string",
+          "required": true,
+          "description": "References Verse.id."
+        },
+        {
+          "name": "created_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "UTC timestamp when bookmarked."
+        }
+      ]
+    },
+    {
+      "name": "Highlight",
+      "description": "User highlight of an entire verse stored locally via Room.",
+      "fields": [
+        {
+          "name": "verse_id",
+          "type": "string",
+          "required": true,
+          "description": "References Verse.id."
+        },
+        {
+          "name": "color_argb",
+          "type": "int",
+          "required": true,
+          "description": "ARGB packed int color."
+        },
+        {
+          "name": "created_at_epoch_ms",
+          "type": "long",
+          "required": true,
+          "description": "UTC timestamp when highlighted."
+        }
+      ]
+    },
+    {
+      "name": "ReadingPreferences",
+      "description": "User reading settings stored locally via DataStore Preferences.",
+      "fields": [
+        {
+          "name": "font_size_sp",
+          "type": "float",
+          "required": true,
+          "description": "Font size in sp."
+        },
+        {
+          "name": "line_height_multiplier",
+          "type": "float",
+          "required": true,
+          "description": "Line spacing multiplier (e.g., 1.0 - 2.0)."
+        },
+        {
+          "name": "font_style",
+          "type": "string",
+          "required": true,
+          "description": "One of: \"serif\" | \"sans\"."
+        },
+        {
+          "name": "theme_mode",
+          "type": "string",
+          "required": true,
+          "description": "One of: \"light\" | \"dark\" | \"system\"."
+        },
+        {
+          "name": "text_alignment",
+          "type": "string",
+          "required": true,
+          "description": "One of: \"start\" | \"center\" | \"justify\"."
+        }
+      ]
+    },
+    {
+      "name": "HealthResponse",
+      "description": "Backend health response payload.",
+      "fields": [
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "description": "Must be \"ok\"."
+        }
+      ]
+    },
+    {
+      "name": "ApiError",
+      "description": "Canonical backend error shape for all non-2xx responses.",
+      "fields": [
+        {
+          "name": "error",
+          "type": "object",
+          "required": true,
+          "description": "Wrapper object for error details."
+        },
+        {
+          "name": "error.code",
+          "type": "string",
+          "required": true,
+          "description": "Stable machine-readable error code (e.g., \"bad_request\", \"not_found\", \"internal\")."
+        },
+        {
+          "name": "error.message",
+          "type": "string",
+          "required": true,
+          "description": "Human-readable error message."
+        },
+        {
+          "name": "error.request_id",
+          "type": "string|null",
+          "required": true,
+          "description": "Optional request id for debugging; may be null."
+        }
+      ]
+    }
+  ],
+  "database": {
+    "kind": "sqlite",
+    "notes": "Android uses Room (SQLite). Backend may use SQLite for demo/health tests. Core app functions must be offline-first; KJV is loaded from local assets and may be seeded into a local verses table for faster search.",
+    "ddl": "/* SQLite schema used by Room (canonical table/column names) */\n\n-- Optional: cached verses for fast search (seeded from assets on first run)\nCREATE TABLE IF NOT EXISTS verses (\n  verse_id TEXT PRIMARY KEY,                 -- \"{book}|{chapter}|{verse}\"\n  book TEXT NOT NULL,\n  chapter INTEGER NOT NULL,\n  verse INTEGER NOT NULL,\n  text TEXT NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_verses_book_chapter_verse ON verses(book, chapter, verse);\n\n-- Bookmarks\nCREATE TABLE IF NOT EXISTS bookmarks (\n  verse_id TEXT PRIMARY KEY,                 -- unique per verse\n  created_at_epoch_ms INTEGER NOT NULL\n);\n\n-- Highlights (entire verse highlight; one highlight per verse)\nCREATE TABLE IF NOT EXISTS highlights (\n  verse_id TEXT PRIMARY KEY,                 -- unique per verse\n  color_argb INTEGER NOT NULL,\n  created_at_epoch_ms INTEGER NOT NULL\n);\n"
+  },
+  "required_files": [
+    "CONTRACT.md",
+    "README.md",
+    "android/README.md",
+    "android/app/src/main/AndroidManifest.xml",
+    "android/app/src/main/assets/bibles/kjv_sample.json",
+    "android/app/src/main/java/com/scriptureflow/App.kt",
+    "android/app/src/main/java/com/scriptureflow/MainActivity.kt",
+    "android/app/src/main/java/com/scriptureflow/core/model/Models.kt",
+    "android/app/src/main/java/com/scriptureflow/core/search/SearchEngine.kt",
+    "android/app/src/main/java/com/scriptureflow/core/util/TextNormalize.kt",
+    "android/app/src/main/java/com/scriptureflow/data/assets/KjvAssetParser.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/AppDatabase.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/entities/BookmarkEntity.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/entities/HighlightEntity.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/dao/BookmarkDao.kt",
+    "android/app/src/main/java/com/scriptureflow/data/db/dao/HighlightDao.kt",
+    "android/app/src/main/java/com/scriptureflow/data/prefs/ReadingPrefsStore.kt",
+    "android/app/src/main/java/com/scriptureflow/data/repo/ScriptureRepository.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/navigation/AppNavGraph.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/shell/DrawerScaffold.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/HomeScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/ReaderScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/SearchScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/BookmarksScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/HighlightsScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/screens/SettingsScreen.kt",
+    "android/app/src/main/java/com/scriptureflow/ui/theme/Theme.kt",
+    "android/app/src/main/java/com/scriptureflow/viewmodel/HomeViewModel.kt"
+  ],
+  "invariants": [
+    "All clients use the same endpoint paths and JSON fields as defined here.",
+    "No renaming of routes, fields, or tables without updating contract.",
+    "Backend must return JSON errors in a consistent shape.",
+    "No login: session_strategy must remain \"none\" and no auth endpoints may be added unless the contract is updated.",
+    "Offline-first: Bible text must be loaded from local assets on device; search must work without network access.",
+    "No tracking/analytics/ads SDKs or telemetry; no collection of user identifiers.",
+    "Deterministic Verse of the Day: for a given local calendar date, the selected Verse.id must be stable across app restarts (seed derived solely from date and local verse corpus).",
+    "Search behavior: case-insensitive, partial-word matches, supports multi-word queries where all query tokens must match within the verse text; match_ranges must refer to indices in the original verse.text.",
+    "Room uniqueness: bookmarks.verse_id and highlights.verse_id are unique (one bookmark and one highlight per verse)."
+  ]
+}
